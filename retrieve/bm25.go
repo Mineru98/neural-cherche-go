@@ -4,12 +4,20 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/Mineru98/neural-cherche-go"
+	neuralcherche "github.com/Mineru98/neural-cherche-go"
 	"github.com/Mineru98/neural-cherche-go/tokenizer"
 	"github.com/Mineru98/neural-cherche-go/utils"
 )
 
 // BM25 implements BM25 retriever
+//
+// This implementation matches the Python neural_cherche BM25 retriever.
+// Default parameters to match Python:
+//   - analyzer: "char_wb" (character n-grams with word boundaries)
+//   - ngram_range: (3, 5)
+//   - k1: 1.5 (term frequency saturation)
+//   - b: 0.75 (length normalization)
+//   - epsilon: 0 (smoothing term)
 type BM25 struct {
 	Key        string
 	On         []string
@@ -27,6 +35,19 @@ type BM25 struct {
 }
 
 // NewBM25 creates a new BM25 retriever
+//
+// Parameters:
+//   - key: Field identifier of each document
+//   - on: Fields to use to match the query to the documents
+//   - minN, maxN: N-gram range (Python default: 3, 5)
+//   - analyzer: "char" or "char_wb" (Python default: "char_wb")
+//   - k1: Term frequency saturation (Python default: 1.5)
+//   - b: Length normalization (Python default: 0.75)
+//   - epsilon: Smoothing term (Python default: 0)
+//
+// Example (matching Python defaults):
+//
+//	retriever := NewBM25("id", []string{"document"}, 3, 5, "char_wb", 1.5, 0.75, 0.0)
 func NewBM25(key string, on []string, minN, maxN int, analyzer string, k1, b, epsilon float64) *BM25 {
 	return &BM25{
 		Key:        key,
@@ -139,24 +160,27 @@ func (bm *BM25) applyBM25Transform(startIdx int) {
 
 	// For each feature, apply BM25 to new documents
 	for featureIdx := 0; featureIdx < vocabSize; featureIdx++ {
-		// Compute IDF
-		df := len(bm.Matrix[featureIdx]) // document frequency
+		// Compute IDF using term frequency sum (matching Python implementation)
+		// In Python: idf = log((N - tf + 0.5) / (tf + 0.5) + 1)
+		// where tf is the sum of term frequencies across all documents
+		tf := bm.TF[featureIdx]
 		idf := 0.0
-		if df > 0 {
-			// IDF = log((N - df + 0.5) / (df + 0.5) + 1)
-			idf = math.Log((float64(bm.NDocuments)-float64(df)+0.5)/(float64(df)+0.5) + 1)
+		if tf > 0 {
+			// IDF = log((N - tf + 0.5) / (tf + 0.5) + 1)
+			// Note: Python uses term frequency sum, not document frequency
+			idf = math.Log((float64(bm.NDocuments)-tf+0.5)/(tf+0.5) + 1)
 		}
 
 		// Apply BM25 formula to each document
 		for docIdx := startIdx; docIdx < bm.NDocuments; docIdx++ {
-			if tf, exists := bm.Matrix[featureIdx][docIdx]; exists {
+			if termFreq, exists := bm.Matrix[featureIdx][docIdx]; exists {
 				// Length normalization
 				docLen := bm.DocLengths[docIdx]
 				normFactor := bm.K1 * (1 - bm.B + bm.B*(docLen/bm.AvgDocLen))
 
 				// BM25 score component
 				// score = (tf * (k1 + 1)) / (tf + normFactor) + epsilon
-				bm25Score := (tf*(bm.K1+1))/(tf+normFactor) + bm.Epsilon
+				bm25Score := (termFreq*(bm.K1+1))/(termFreq+normFactor) + bm.Epsilon
 
 				// Multiply by IDF
 				bm.Matrix[featureIdx][docIdx] = bm25Score * idf

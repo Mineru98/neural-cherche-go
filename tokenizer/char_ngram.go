@@ -2,10 +2,17 @@ package tokenizer
 
 import (
 	"strings"
-	"unicode"
 )
 
 // CharNGramTokenizer tokenizes text into character n-grams
+//
+// This implementation matches sklearn's CountVectorizer/TfidfVectorizer with:
+//   - analyzer="char": Character-level n-grams, preserving whitespace
+//   - analyzer="char_wb": Character n-grams within word boundaries
+//
+// Key differences from traditional tokenizers:
+//   - "char" analyzer includes whitespace in n-grams (matching sklearn)
+//   - "char_wb" analyzer adds space markers around words before n-gramming
 type CharNGramTokenizer struct {
 	MinN       int
 	MaxN       int
@@ -37,6 +44,7 @@ func (t *CharNGramTokenizer) Tokenize(text string) []string {
 
 	if t.Analyzer == "char_wb" {
 		// Word boundary: add spaces around words
+		// This matches sklearn's char_wb analyzer
 		words := strings.Fields(text)
 		for _, word := range words {
 			if t.StopWords[word] {
@@ -48,13 +56,9 @@ func (t *CharNGramTokenizer) Tokenize(text string) []string {
 		}
 	} else {
 		// Pure character n-grams
-		// Remove whitespace for pure char analyzer
-		text = strings.Map(func(r rune) rune {
-			if unicode.IsSpace(r) {
-				return -1
-			}
-			return r
-		}, text)
+		// This matches sklearn's char analyzer
+		// Note: Unlike some implementations, sklearn's "char" analyzer
+		// PRESERVES whitespace characters in the n-grams
 		tokens = t.extractNGrams(text)
 	}
 

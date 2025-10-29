@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/Mineru98/neural-cherche-go"
+	neuralcherche "github.com/Mineru98/neural-cherche-go"
 	"github.com/Mineru98/neural-cherche-go/tokenizer"
 	"github.com/Mineru98/neural-cherche-go/utils"
 )
@@ -13,6 +13,12 @@ import (
 type SparseVector map[int]float64
 
 // TfIdf implements TF-IDF retriever
+//
+// This implementation matches the Python neural_cherche TfIdf retriever.
+// Default parameters to match Python:
+//   - analyzer: "char" (pure character n-grams, no word boundaries)
+//   - ngram_range: (3, 5)
+//   - normalize: true (L2 normalization applied to document vectors)
 type TfIdf struct {
 	Key        string
 	On         []string
@@ -25,6 +31,16 @@ type TfIdf struct {
 }
 
 // NewTfIdf creates a new TF-IDF retriever
+//
+// Parameters:
+//   - key: Field identifier of each document
+//   - on: Fields to use to match the query to the documents
+//   - minN, maxN: N-gram range (Python default: 3, 5)
+//   - analyzer: "char" or "char_wb" (Python default: "char")
+//
+// Example (matching Python defaults):
+//
+//	retriever := NewTfIdf("id", []string{"document"}, 3, 5, "char")
 func NewTfIdf(key string, on []string, minN, maxN int, analyzer string) *TfIdf {
 	return &TfIdf{
 		Key:       key,

@@ -126,24 +126,50 @@ func (c *ColBERT) EncodeTokenized(
 		}
 	}
 
-	// Apply linear projection if available
+	// Follow Python implementation order:
+	// 1. Apply attention mask (element-wise multiplication)
+	// 2. Apply linear projection (if available)
+	// 3. Normalize embeddings (L2 normalization)
+
+	embeddings = c.multiplyAttentionMask(embeddings, attentionMask)
+
 	if c.hasLinearLayer {
-		embeddings = c.applyLinearProjection(embeddings, attentionMask)
+		embeddings = c.applyLinearProjection(embeddings)
 	}
 
-	// Apply attention mask
-	embeddings = c.applyAttentionMask(embeddings, attentionMask)
-
-	// Normalize embeddings (L2 normalization)
 	embeddings = c.normalizeEmbeddings(embeddings)
 
 	return embeddings, nil
 }
 
+// multiplyAttentionMask multiplies embeddings with attention mask (element-wise)
+// This matches Python's: embeddings * attention_mask
+func (c *ColBERT) multiplyAttentionMask(
+	embeddings [][][]float32,
+	attentionMask [][]int64,
+) [][][]float32 {
+	batchSize := len(embeddings)
+	seqLen := len(embeddings[0])
+	embSize := len(embeddings[0][0])
+
+	masked := make([][][]float32, batchSize)
+	for i := 0; i < batchSize; i++ {
+		masked[i] = make([][]float32, seqLen)
+		for j := 0; j < seqLen; j++ {
+			masked[i][j] = make([]float32, embSize)
+			if j < len(attentionMask[i]) && attentionMask[i][j] == 1 {
+				copy(masked[i][j], embeddings[i][j])
+			}
+			// Else leave as zeros (mask == 0)
+		}
+	}
+
+	return masked
+}
+
 // applyLinearProjection applies linear projection to reduce embedding dimension
 func (c *ColBERT) applyLinearProjection(
 	embeddings [][][]float32,
-	attentionMask [][]int64,
 ) [][][]float32 {
 	batchSize := len(embeddings)
 	seqLen := len(embeddings[0])
@@ -168,30 +194,6 @@ func (c *ColBERT) applyLinearProjection(
 	}
 
 	return projected
-}
-
-// applyAttentionMask applies attention mask to embeddings
-func (c *ColBERT) applyAttentionMask(
-	embeddings [][][]float32,
-	attentionMask [][]int64,
-) [][][]float32 {
-	batchSize := len(embeddings)
-	seqLen := len(embeddings[0])
-	embSize := len(embeddings[0][0])
-
-	masked := make([][][]float32, batchSize)
-	for i := 0; i < batchSize; i++ {
-		masked[i] = make([][]float32, seqLen)
-		for j := 0; j < seqLen; j++ {
-			masked[i][j] = make([]float32, embSize)
-			if j < len(attentionMask[i]) && attentionMask[i][j] == 1 {
-				copy(masked[i][j], embeddings[i][j])
-			}
-			// Else leave as zeros
-		}
-	}
-
-	return masked
 }
 
 // normalizeEmbeddings applies L2 normalization to embeddings
