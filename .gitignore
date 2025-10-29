@@ -1,0 +1,50 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test binary
+*.test
+
+# Output of go build
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Models and data
+*.onnx
+*.npy
+*.json
+!go.mod
+!go.sum
+!**/metadata.json
+!**/tokenizer.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Examples output
+examples/output/
+examples/models/
+
+# Cache
+*.cache
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
